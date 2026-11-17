@@ -10,16 +10,15 @@ owned by other users or organizations. It summarizes open and recently merged PR
 records and current HEAD checks without pretending that a green check means
 “ready to merge.” English and Korean output are supported.
 
-## The profile card
+## A native README, not an image
 
-Recently merged work leads the design: featured contribution cards, a quieter
-open-PR preview, and a small set of clear totals. Desktop and mobile have separate
-layouts, with light and dark themes. Native PR links and full status details stay
-available below the visual.
+Recently merged contributions come first, with linked titles and quiet repository
+metadata. Open work remains visible below, with expandable review
+and HEAD-check details available without leaving GitHub.
 
-The four SVG images are generated into your own repository. There is no badge
-server, tracking pixel, external font, or third-party image host. The action
-updates the README and images from the same public-data snapshot.
+Everything is native Markdown and supported HTML: selectable text, real links,
+natural wrapping on narrow screens, and GitHub's own light and dark themes.
+No generated images, badges, external hosting, or extra assets.
 
 ## Install in your profile
 
@@ -47,8 +46,7 @@ by GitHub. The update job needs `contents: write` only to commit its own README.
 If branch protection or your organization blocks that write, keep the protection
 and adapt your own review process instead of granting broader access.
 
-The action edits the README and four SVG files. **Your workflow owns committing
-them together.** Everything
+The action edits only the README. **Your workflow owns committing it.** Everything
 outside the marker pair is preserved. Missing, duplicated or reversed markers
 are errors, not an invitation to overwrite your biography.
 
@@ -61,7 +59,6 @@ are errors, not an invitation to overwrite your biography.
 | `limit` | `5` | PRs per category, from 1 to 20 |
 | `language` | `en` | `en` or `ko` |
 | `include-own` | `false` | Include repositories owned by the queried `username` |
-| `assets-dir` | `assets/pr-compass` | Relative to the README directory; generated SVG files only |
 | `token` | `${{ github.token }}` | Optional built-in token for rate limits |
 
 ## Run locally
@@ -75,16 +72,15 @@ node --test
 
 Use `--language ko` for Korean. The CLI accepts `PR_COMPASS_USERNAME`,
 `PR_COMPASS_README`, `PR_COMPASS_LIMIT`, and `PR_COMPASS_LANGUAGE` environment
-variables, plus `PR_COMPASS_INCLUDE_OWN`, `PR_COMPASS_ASSETS_DIR`, and optional `GITHUB_TOKEN`. Never put a token in a command argument
+variables, plus `PR_COMPASS_INCLUDE_OWN`, and optional `GITHUB_TOKEN`. Never put a token in a command argument
 or commit it. Unauthenticated calls have much lower rate limits.
 
 To also include your own repositories, use `include-own: 'true'` in the Action
 or `--include-own` in the CLI. The default is `false`.
 
-If you change `readme` or `assets-dir`, update the workflow’s `git add` paths too.
-Do not hand-edit the four generated `overview*.svg` files. Their names are fixed,
-so scheduled runs do not accumulate old assets. Cache-busting image URLs track
-the snapshot timestamp; GitHub image rendering can still lag briefly.
+If you change `readme`, update the workflow’s `git add` path too.
+Upgrading from the image-based version? Remove `assets-dir` inputs and the old
+generated `assets/pr-compass` folder, then stage only your README in the workflow.
 
 ## What the status means
 
@@ -124,7 +120,7 @@ API limits include separate search and secondary limits. Requests are bounded
 and sequential; the tool does not retry aggressively. On a rate limit, wait
 until GitHub allows another run rather than increasing token permissions.
 
-To uninstall, remove the workflow and its generated `assets/pr-compass` folder.
+To uninstall, remove the workflow.
 Remove the marked block too if you no longer
 want the last snapshot displayed. Removing only the block will cause subsequent
 runs to fail safely.

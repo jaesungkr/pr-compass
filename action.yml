@@ -20,9 +20,6 @@ inputs:
   include-own:
     description: Include repositories owned by username (including own forks); organizations remain included either way
     default: 'false'
-  assets-dir:
-    description: Relative directory beside the README for the four generated SVG cards
-    default: assets/pr-compass
   token:
     description: Optional built-in GitHub token for API rate limits; do not use a personal access token
     default: ${{ github.token }}
@@ -40,7 +37,6 @@ runs:
         INPUT_USERNAME: ${{ inputs.username }}
         INPUT_README: ${{ inputs.readme }}
         INPUT_LIMIT: ${{ inputs.limit }}
-        INPUT_ASSETS_DIR: ${{ inputs.assets-dir }}
         INPUT_INCLUDE_OWN: ${{ inputs.include-own }}
         INPUT_LANGUAGE: ${{ inputs.language }}
         GITHUB_TOKEN: ${{ inputs.token }}

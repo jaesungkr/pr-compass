@@ -67,15 +67,15 @@ test('include-own CLI and environment settings have strict boolean semantics',()
  assert.equal(parseArgs([],{INPUT_USERNAME:'octocat',INPUT_INCLUDE_OWN:'true',PR_COMPASS_INCLUDE_OWN:'false'}).includeOwn,false);
  for(const bad of ['yes','1','FALSE',''])assert.throws(()=>parseArgs([],{INPUT_USERNAME:'octocat',INPUT_INCLUDE_OWN:bad}),/include-own/);
 });
-test('compact three-column output shows counts, exact HEAD, active review and localized scope',async()=>{
+test('native output shows counts, exact HEAD, active review and localized scope',async()=>{
  const p=pr();p.draft=true;
  const responses=detailResponses(p);responses[2].data={total_count:3,check_runs:[{status:'completed',conclusion:'success'},{status:'completed',conclusion:'skipped'},{status:'completed',conclusion:'failure'}]};
  const f=fixture([{data:{...search([item()]),total_count:7}},{data:search([])},...responses]);
  const d=await collect({username:'octocat',client:f.client});const md=renderMarkdown(d);
- assert.match(md,/Showing 1 of 7/);assert.match(md,/\| --- \| --- \| --- \|/);
+ assert.match(md,/Showing 1 of 7/);assert.doesNotMatch(md,/\| ---/);
  assert.doesNotMatch(md,/\| --- \| --- \| --- \| --- \|/);
  assert.match(md,/\*\*Draft\*\*/);assert.match(md,new RegExp(`/commit/${sha}`));
- assert.match(md,/1 success; 1 failed; 1 neutral \/ skipped \/ other/);
+ assert.match(md,/1 failed; 1 success; 1 neutral \/ skipped \/ other/);
  assert.doesNotMatch(md,/0 pending|0 approved|0 changes requested/);
  assert.match(md,/No active decision reviews/);assert.match(md,/<details>/);
  const ko=renderMarkdown(d,{language:'ko'});assert.match(ko,/외부 저장소 기여만 표시/);assert.match(ko,/7건 중 1건 표시/);assert.match(ko,/초안/);
@@ -86,16 +86,23 @@ test('include-own cannot opt into private data',async()=>{
  await assert.rejects(collect({username:'octocat',includeOwn:true,client:f.client}),/visibility/);
 });
 
-test('merged-first visual embeds responsive themes with native PR links and accessible detail',async()=>{
- const p=pr();p.merged=true;p.state='closed';
- const f=fixture([{data:search([])},{data:search([item()])},...detailResponses(p)]);
- const data=await collect({username:'octocat',client:f.client,now:'2026-01-01T00:00:00Z'});
- const md=renderMarkdown(data,{visual:{directory:'assets/pr-compass'}});
- for(const name of ['overview-light','overview-dark','overview-mobile-light','overview-mobile-dark'])assert.match(md,new RegExp(name+'\\.svg\\?v='));
- assert.match(md,/<a href="[^"]+#gh-dark-mode-only">/);assert.match(md,/#gh-dark-mode-only/);assert.match(md,/#gh-light-mode-only/);assert.match(md,/max-width: 600px/);assert.doesNotMatch(md,/prefers-color-scheme/);assert.equal((md.match(/<picture>/g)||[]).length,2);
- assert.match(md,/alt="Recently merged: 1; Open: 0/);assert.match(md,/PR links & status details/);
- assert.ok(md.indexOf('#### Recently merged')<md.indexOf('#### Open'));
- assert.match(md,/\[upstream\/example #1\]\(https:\/\/github.com\/upstream\/example\/pull\/1\)/);
- assert.throws(()=>renderMarkdown(data,{visual:{directory:'../outside'}}),/visual directory/);
- assert.throws(()=>renderMarkdown(data,{visual:{directory:'https://evil.test'}}),/visual directory/);
+test('native merged-first entries remain visible, have no dates or images, and collapse only status detail',async()=>{
+ const p=pr();p.merged=true;p.state='closed';p.merged_at='2026-01-02T00:00:00Z';
+ const f=fixture([{data:search([item(2)])},{data:search([item()])},...detailResponses(pr(2)),...detailResponses(p)]);
+ const data=await collect({username:'octocat',client:f.client,now:'2026-01-03T00:00:00Z'});
+ const md=renderMarkdown(data);
+ assert.ok(md.indexOf('### Recently merged')<md.indexOf('#### Open'));
+ assert.ok(md.indexOf('#### Open')<md.indexOf('<details>'));
+ assert.match(md,/- \*\*\[Fix thing\]\(https:\/\/github.com\/upstream\/example\/pull\/1\)\*\*/);
+ assert.match(md,/Checks &amp; review/);
+ assert.ok(md.indexOf('Observed:')>md.indexOf('<summary>About this snapshot</summary>'));
+ assert.doesNotMatch(md,/2026-01-02|<img|<svg|<picture|\.svg|!\[|\| ---/);
+ assert.match(md,/Observed: 2026-01-03 00:00:00 UTC/);
+});
+test('native titles escape injected Markdown and HTML in both visible lists',async()=>{
+ const p=pr();p.title='[bad](https://evil.test) <img src=x> | @everyone';
+ const f=fixture([{data:search([item()])},{data:search([])},...detailResponses(p)]);
+ const md=renderMarkdown(await collect({username:'octocat',client:f.client}));
+ assert.doesNotMatch(md,/<img|@everyone|\]\(https:\/\/evil\.test\)/);
+ assert.match(md,/&lt;img/);
 });

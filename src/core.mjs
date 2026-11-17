@@ -125,37 +125,29 @@ const texts = {
   en:{heading:'Contribution activity',allHeading:'Public pull requests',external:'External repositories only',allScope:'All public repositories',showing:(shown,total)=>`Showing ${shown} of ${total}`,details:'PR links & status details',method:'About this snapshot',open:'Open',merged:'Recently merged',empty:'No public PRs found.',columns:'Contribution | Status | Checks · review',draft:'Draft',closed:'Closed',mergedState:'Merged',openState:'Open',unknown:'Unavailable',partial:'Partial data',none:'No public HEAD checks',success:'success',failed:'failed',pending:'pending',attention:'cancelled / action needed',other:'neutral / skipped / other',noReviews:'No active decision reviews',approved:'approved',current:'on current HEAD',changes:'changes requested',at:'Observed',scope:'Public PRs only. HEAD checks and review records are not a merge-readiness verdict. Required checks, branch protection, test-merge checks, and resolved conversations are not evaluated.',cap:'Lists are sampled from up to 100 most recently updated matches; merged items are sorted by merge date within that sample.',count:'search matches'},
   ko:{heading:'최근 기여 현황',allHeading:'공개 Pull Request',external:'외부 저장소 기여만 표시',allScope:'모든 공개 저장소',showing:(shown,total)=>`${total}건 중 ${shown}건 표시`,details:'PR 링크와 상세 상태',method:'조회 범위와 상태 안내',open:'진행 중',merged:'최근 병합',empty:'조회된 공개 PR이 없습니다.',columns:'기여 | 상태 | 검사 · 리뷰',draft:'초안',closed:'닫힘',mergedState:'병합',openState:'진행 중',unknown:'조회 불가',partial:'일부 정보',none:'공개 HEAD 검사 없음',success:'성공',failed:'실패',pending:'진행',attention:'취소·조치 필요',other:'중립·생략·기타',noReviews:'유효한 결정 리뷰 없음',approved:'승인',current:'현재 HEAD',changes:'수정 요청',at:'확인',scope:'공개 PR만 표시합니다. HEAD 검사와 리뷰 기록은 병합 가능 판정이 아닙니다. 필수 검사·브랜치 보호·테스트 병합 커밋 검사·대화 해결 여부는 확인하지 않습니다.',cap:'최근 업데이트순 최대 100건에서 조회하며, 병합 목록은 그 결과 안에서 병합일순입니다.',count:'검색 결과'}
 };
-export function renderMarkdown(data, {language='en', visual} = {}) {
+export function renderMarkdown(data, {language='en'} = {}) {
   const t = texts[language]; if (!t) throw new Error('Language must be en or ko.');
-  const lines = [`### ${data.includeOwn ? t.allHeading : t.heading}`, '', `**${t.merged} ${data.totals.merged} · ${t.open} ${data.totals.open}**`, '', `<sub>${data.includeOwn ? t.allScope : t.external} · ${t.at}: ${data.observedAt.replace('T',' ').replace(/\.\d{3}Z$/,' UTC')}</sub>`, ''];
-  if (visual) {
-    const directory = visual.directory;
-    if (typeof directory !== 'string' || !/^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)*$/.test(directory) || directory.split('/').some(p => p === '.' || p === '..')) throw new Error('Invalid visual directory.');
-    const version = encodeURIComponent(data.observedAt);
-    const asset = name => `${directory}/${name}.svg?v=${version}`;
-    const alt = `${t.merged}: ${data.totals.merged}; ${t.open}: ${data.totals.open}. ${data.includeOwn ? t.allScope : t.external}.`;
-    // GitHub rewrites prefers-color-scheme source media, dropping compound width conditions.
-    // Theme fragments hide one image; each independent picture keeps its width-only source.
-    lines.splice(0, lines.length);
-    for (const theme of ['light','dark']) lines.push(`<a href="${asset('overview-'+theme)}#gh-${theme}-mode-only">`, '<picture>', `  <source media="(max-width: 600px)" srcset="${asset('overview-mobile-'+theme)}#gh-${theme}-mode-only">`, `  <img src="${asset('overview-'+theme)}#gh-${theme}-mode-only" alt="${alt}" width="920">`, '</picture>', '</a>');
-    lines.push('');
-    if (data.merged.length) lines.push(`**${t.merged}:** ` + data.merged.slice(0,3).map(p => `[${escapeMarkdown(p.repo)} #${p.number}](${p.url})`).join(' · '), '');
-    lines.push('<details>', `<summary>${t.details}</summary>`, '', `> ${t.at}: ${data.observedAt.replace('T',' ').replace(/\.\d{3}Z$/,' UTC')}`, '');
-  }
-  for (const kind of ['merged','open']) {
-    lines.push(`#### ${t[kind]}`, ``, `<sub>${t.showing(data[kind].length,data.totals[kind])}</sub>`, '');
-    if (!data[kind].length) {lines.push(t.empty,''); continue;}
-    lines.push(`| ${t.columns} |`,'| --- | --- | --- |');
-    for (const p of data[kind]) {
-      const state = p.merged ? t.mergedState : p.closed ? t.closed : p.draft ? t.draft : t.openState;
-      const c = p.checks, r = p.review;
-      const ci = p.checksUnknown ? t.unknown : !c.total ? t.none : [['success',t.success],['failed',t.failed],['pending',t.pending],['attention',t.attention],['other',t.other]].filter(([key]) => c[key]).map(([key,label]) => `${c[key]} ${label}`).join('; ');
-      const review = p.reviewUnknown ? t.unknown : !r.approvals && !r.changes ? t.noReviews : [r.approvals ? `${r.approvals} ${t.approved} (${r.current} ${t.current})` : '', r.changes ? `${r.changes} ${t.changes}` : ''].filter(Boolean).join('; ');
-      lines.push(`| [**${escapeMarkdown(p.repo)}#${p.number}**](${p.url})<br>${escapeMarkdown(p.title)} | **${state}**<br>[\`${p.sha.slice(0,7)}\`](https://github.com/${p.repo}/commit/${p.sha})${p.partial ? `<br>⚠ ${t.partial}` : ''} | ${ci}<br><sub>${review}</sub> |`);
+  const observed=data.observedAt.replace('T',' ').replace(/\.\d{3}Z$/,' UTC');
+  const lines=[`### ${t.merged} · ${data.totals.merged}`, '', `<sub>${data.includeOwn?t.allScope:t.external} · ${t.showing(data.merged.length,data.totals.merged)}</sub>`, ''];
+  const metadata=p=>`${escapeMarkdown(p.repo)} · #${p.number}`;
+  const state=p=>p.merged?t.mergedState:p.closed?t.closed:p.draft?t.draft:t.openState;
+  for(const p of data.merged)lines.push(`- **[${escapeMarkdown(p.title)}](${p.url})**  `,`  <sub>${metadata(p)}</sub>`,'');
+  if(!data.merged.length)lines.push(t.empty,'');
+  lines.push(`#### ${t.open} · ${data.totals.open}`,'',`<sub>${t.showing(data.open.length,data.totals.open)}</sub>`,'');
+  for(const p of data.open)lines.push(`- [${escapeMarkdown(p.title)}](${p.url})  `,`  <sub>${metadata(p)} · ${state(p)}</sub>`,'');
+  if(!data.open.length)lines.push(t.empty,'');
+  lines.push('<details>',`<summary>${language==='ko'?'검사와 리뷰 자세히 보기':'Checks &amp; review'}</summary>`,'');
+  for(const kind of ['merged','open']) {
+    if(!data[kind].length)continue;
+    lines.push(`**${t[kind]}**`,'');
+    for(const p of data[kind]) {
+      const c=p.checks,r=p.review;
+      const ci=p.checksUnknown?t.unknown:!c.total?t.none:[['failed',t.failed],['pending',t.pending],['attention',t.attention],['success',t.success],['other',t.other]].filter(([key])=>c[key]).map(([key,label])=>`${c[key]} ${label}`).join('; ');
+      const review=p.reviewUnknown?t.unknown:!r.approvals&&!r.changes?t.noReviews:[r.approvals?`${r.approvals} ${t.approved} (${r.current} ${t.current})`:'',r.changes?`${r.changes} ${t.changes}`:''].filter(Boolean).join('; ');
+      lines.push(`- [${escapeMarkdown(p.repo)} #${p.number}](${p.url}) · **${state(p)}** · [\`${p.sha.slice(0,7)}\`](https://github.com/${p.repo}/commit/${p.sha})  `,
+        `  ${p.partial?'**⚠ '+t.partial+'** · ':''}HEAD: ${ci}  `,`  <sub>${review}</sub>`,'');
     }
-    lines.push('');
   }
-  lines.push('<details>', `<summary>${t.method}</summary>`, '', `${t.scope} ${t.cap}`, '', '</details>');
-  if (visual) lines.push('', '</details>');
+  lines.push('</details>','','<details>',`<summary>${t.method}</summary>`,'',`${t.at}: ${observed}`,'',`${t.scope} ${t.cap}`,'','</details>');
   return lines.join('\n');
 }
