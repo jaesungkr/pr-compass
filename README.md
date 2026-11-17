@@ -18,10 +18,10 @@ records and current HEAD checks without pretending that a green check means
    ```
 
 2. Copy [`examples/profile-workflow.yml`](examples/profile-workflow.yml) into
-   `.github/workflows/pr-compass.yml` in that repository. Replace
-   `REPLACE_WITH_REVIEWED_COMMIT_SHA` with a **full reviewed commit SHA** from this
-   repository. The default username is your repository owner. Change `language`
-   to `ko` for Korean.
+   `.github/workflows/pr-compass.yml` in that repository. The example is pinned
+   to a tested full commit SHA. Review that revision before enabling the workflow;
+   keep future upgrades pinned to a full reviewed SHA too. The default username
+   is your repository owner. Change `language` to `ko` for Korean.
 
 3. Open **Actions → Update public PR status → Run workflow** on your default
    branch. Check the first run and the resulting README commit. Thereafter the

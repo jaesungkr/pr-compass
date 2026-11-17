@@ -16,7 +16,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: jaesungkr/pr-compass@REPLACE_WITH_REVIEWED_COMMIT_SHA
+      - uses: jaesungkr/pr-compass@45147c9da0f98888aa4b25c0782ba7dde11bb85c
         with:
           username: ${{ github.repository_owner }}
           limit: '5'
