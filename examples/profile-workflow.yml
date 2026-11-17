@@ -1,0 +1,33 @@
+name: Update public PR status
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pr-compass-profile
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: jaesungkr/pr-compass@REPLACE_WITH_REVIEWED_COMMIT_SHA
+        with:
+          username: ${{ github.repository_owner }}
+          limit: '5'
+          language: en
+          token: ${{ github.token }}
+      - name: Commit only the README change
+        shell: bash
+        run: |
+          if git diff --quiet -- README.md; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- README.md
+          git commit -m "docs: update public PR status"
+          git push
