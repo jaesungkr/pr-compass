@@ -92,7 +92,7 @@ test('merged-first visual embeds responsive themes with native PR links and acce
  const data=await collect({username:'octocat',client:f.client,now:'2026-01-01T00:00:00Z'});
  const md=renderMarkdown(data,{visual:{directory:'assets/pr-compass'}});
  for(const name of ['overview-light','overview-dark','overview-mobile-light','overview-mobile-dark'])assert.match(md,new RegExp(name+'\\.svg\\?v='));
- assert.match(md,/prefers-color-scheme: dark/);assert.match(md,/max-width: 600px/);
+ assert.match(md,/#gh-dark-mode-only/);assert.match(md,/#gh-light-mode-only/);assert.match(md,/max-width: 600px/);assert.doesNotMatch(md,/prefers-color-scheme/);assert.equal((md.match(/<picture>/g)||[]).length,2);
  assert.match(md,/alt="Recently merged: 1; Open: 0/);assert.match(md,/PR links & status details/);
  assert.ok(md.indexOf('#### Recently merged')<md.indexOf('#### Open'));
  assert.match(md,/\[upstream\/example #1\]\(https:\/\/github.com\/upstream\/example\/pull\/1\)/);

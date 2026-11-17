@@ -134,7 +134,11 @@ export function renderMarkdown(data, {language='en', visual} = {}) {
     const version = encodeURIComponent(data.observedAt);
     const asset = name => `${directory}/${name}.svg?v=${version}`;
     const alt = `${t.merged}: ${data.totals.merged}; ${t.open}: ${data.totals.open}. ${data.includeOwn ? t.allScope : t.external}.`;
-    lines.splice(0, lines.length, '<picture>', `  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="${asset('overview-mobile-dark')}">`, `  <source media="(max-width: 600px)" srcset="${asset('overview-mobile-light')}">`, `  <source media="(prefers-color-scheme: dark)" srcset="${asset('overview-dark')}">`, `  <img src="${asset('overview-light')}" alt="${alt}" width="920">`, '</picture>', '');
+    // GitHub rewrites prefers-color-scheme source media, dropping compound width conditions.
+    // Theme fragments hide one image; each independent picture keeps its width-only source.
+    lines.splice(0, lines.length);
+    for (const theme of ['light','dark']) lines.push('<picture>', `  <source media="(max-width: 600px)" srcset="${asset('overview-mobile-'+theme)}#gh-${theme}-mode-only">`, `  <img src="${asset('overview-'+theme)}#gh-${theme}-mode-only" alt="${alt}" width="920">`, '</picture>');
+    lines.push('');
     if (data.merged.length) lines.push(`**${t.merged}:** ` + data.merged.slice(0,3).map(p => `[${escapeMarkdown(p.repo)} #${p.number}](${p.url})`).join(' · '), '');
     lines.push('<details>', `<summary>${t.details}</summary>`, '', `> ${t.at}: ${data.observedAt.replace('T',' ').replace(/\.\d{3}Z$/,' UTC')}`, '');
   }
