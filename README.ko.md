@@ -48,7 +48,7 @@ Action은 파일만 수정합니다. **커밋은 호출한 워크플로가 담�
 
 ### 외부 기여의 기준
 
-저장소 소유자를 **조회 대상 `username`**과 대소문자 구분 없이 비교합니다.
+저장소 소유자를 조회 대상 `username`과 대소문자 구분 없이 비교합니다.
 토큰 소유자나 워크플로 실행자를 기준으로 판단하지 않습니다.
 
 - 본인 소유 저장소와 본인 계정으로 포크한 저장소의 PR은 기본적으로 제외합니다.
@@ -65,7 +65,7 @@ node src/cli.mjs --username YOUR_USERNAME --readme /path/to/README.md --limit 5 
 node --test
 ```
 
-본인 저장소도 포함하려면 `--include-own`를 추가합니다. 기본값은 `false`입니다.
+본인 저장소도 포함하려면 `--include-own` 옵션을 추가합니다. 기본값은 `false`입니다.
 환경변수 `PR_COMPASS_USERNAME`, `PR_COMPASS_README`, `PR_COMPASS_LIMIT`,
 `PR_COMPASS_LANGUAGE`, `PR_COMPASS_INCLUDE_OWN`도 사용할 수 있습니다.
 `GITHUB_TOKEN`은 선택사항입니다. 토큰을 명령줄 인자나 커밋에 넣지 마세요.
