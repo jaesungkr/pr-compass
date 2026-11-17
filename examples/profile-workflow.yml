@@ -16,7 +16,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: jaesungkr/pr-compass@ccc2e38b77f7d6e9af8a3b2216ca31b21737e88f
+      - uses: jaesungkr/pr-compass@de1b79d8b2f4b84738b67767bc914f7c04b23bb4
         with:
           username: ${{ github.repository_owner }}
           limit: '5'
