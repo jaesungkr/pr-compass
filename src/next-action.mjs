@@ -120,25 +120,87 @@ export function analyze(data, {language='en'} = {}) {
 function oneLine(value) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028-\u202e\u2066-\u2069]/g,' ');
 }
-/** Plain terminal output. color is accepted for CLI compatibility; ANSI is never emitted. */
-export function renderText(report, {color=false} = {}) {
-  void color;
-  const t=copy[report.language || 'en']; if (!t) throw new Error('Language must be en or ko.');
-  const lines=[`${t.title} · @${oneLine(report.username)}`,`${t.observed}: ${oneLine(report.observedAt)}`,
-    CATEGORIES.map(k=>`${t.labels[k]} ${report.summary[k]}`).join(' · '),''];
-  if(report.sample){const x=report.sample;lines.splice(2,0,report.language==='ko'?`조회 표본: 열린 PR ${x.open.shown}/${x.open.total??'?'} · 병합 PR ${x.merged.shown}/${x.merged.total??'?'}`:`Sample: open ${x.open.shown}/${x.open.total??'?'} · merged ${x.merged.shown}/${x.merged.total??'?'}`);}
-  if (!report.items.length) lines.push(t.empty,'');
-  for (const category of CATEGORIES) {
-    const items=report.items.filter(p=>p.category===category); if (!items.length) continue;
-    lines.push(`${t.labels[category]} (${items.length})`);
-    for (const p of items) {
-      lines.push(`  ${oneLine(p.repo)}#${p.number} — ${oneLine(p.title)}`,`  ${oneLine(p.url)}`);
-      for (const r of p.reasons) lines.push(`  • ${oneLine(r.message)}`);
-      lines.push(`  → ${oneLine(p.nextStep)}`);
-      for (const caveat of p.caveats) lines.push(`  ! ${oneLine(caveat)}`);
-      lines.push('');
+const DISPLAY_ORDER = ['attention', 'unknown', 'waiting', 'done'];
+const graphemes = new Intl.Segmenter(undefined, {granularity:'grapheme'});
+function cellWidth(text) {
+  let width=0;
+  for (const {segment} of graphemes.segment(text)) {
+    if (/^[\p{Mark}\u200d\ufe0e\ufe0f]+$/u.test(segment)) continue;
+    const cp=segment.codePointAt(0);
+    const wide=cp>=0x1100 && (cp<=0x115f || cp===0x2329 || cp===0x232a || (cp>=0x2e80&&cp<=0xa4cf&&cp!==0x303f)
+      || (cp>=0xac00&&cp<=0xd7a3) || (cp>=0xf900&&cp<=0xfaff) || (cp>=0xfe10&&cp<=0xfe19)
+      || (cp>=0xfe30&&cp<=0xfe6f) || (cp>=0xff00&&cp<=0xff60) || (cp>=0xffe0&&cp<=0xffe6)
+      || (cp>=0x20000&&cp<=0x3fffd));
+    width+=wide || /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(segment) ? 2 : 1;
+  }
+  return width;
+}
+function wrap(text, width, prefix='', continuation=prefix) {
+  const words=oneLine(text).trim().split(/\s+/u), lines=[];
+  let line=prefix, occupied=cellWidth(prefix), hasText=false;
+  const flush=()=>{lines.push(line.trimEnd());line=continuation;occupied=cellWidth(continuation);hasText=false;};
+  for (const word of words) {
+    if (!word) continue;
+    const wordWidth=cellWidth(word);
+    if (hasText && occupied+1+wordWidth<=width) {line+=' '+word;occupied+=1+wordWidth;continue;}
+    if (hasText) flush();
+    // A Korean phrase or an unbroken identifier may exceed a line. Split only at grapheme boundaries.
+    for (const {segment} of graphemes.segment(word)) {
+      const size=cellWidth(segment);
+      if (occupied+size>width && hasText) flush();
+      line+=segment;occupied+=size;hasText=true;
     }
   }
-  lines.push(oneLine(report.scope),...report.limitations.map(oneLine));
+  if (hasText || !lines.length) lines.push(line.trimEnd());
+  return lines;
+}
+const displayCopy={
+  en:{sample:'Sample',open:'open',merged:'merged',evidence:'Evidence',next:'Next',note:'Caution',signal:'Signal',
+    signals:{checks_failed:'Check failure / timeout',changes_requested:'Review changes requested',checks_need_attention:'Cancelled / action needed',draft:'Draft',incomplete_data:'Incomplete evidence',no_public_checks:'No public HEAD checks',non_success_results:'Neutral / skipped / other',insufficient_evidence:'Insufficient evidence',checks_pending:'Checks running',no_public_blocker_observed:'Observed checks successful',merged:'Merged',closed_without_merge:'Closed without merge'}},
+  ko:{sample:'조회 표본',open:'열린 PR',merged:'병합 PR',evidence:'근거',next:'다음',note:'주의',signal:'신호',
+    signals:{checks_failed:'검사 실패 / 시간 초과',changes_requested:'수정 요청 리뷰',checks_need_attention:'취소 / 조치 필요',draft:'초안',incomplete_data:'불완전한 근거',no_public_checks:'공개 HEAD 검사 없음',non_success_results:'중립 / 생략 / 기타',insufficient_evidence:'근거 부족',checks_pending:'검사 실행 중',no_public_blocker_observed:'조회된 검사 성공',merged:'병합 완료',closed_without_merge:'병합 없이 종료'}}
+};
+/** Readable terminal cards. URLs remain intact; only headings and field labels can have ANSI color. */
+export function renderText(report, {color=false,width=80} = {}) {
+  if (!Number.isInteger(width) || width<20 || width>240) throw new Error('Width must be an integer from 20 to 240.');
+  const language=report.language || 'en', t=copy[language], d=displayCopy[language];
+  if (!t) throw new Error('Language must be en or ko.');
+  const paint=(text,code)=>color ? `\u001b[${code}m${text}\u001b[0m` : text;
+  const lines=wrap(`${t.title} / @${oneLine(report.username)}`,width).map(line=>paint(line,'1'));
+  lines.push(...wrap(`${t.observed}: ${oneLine(report.observedAt)}`,width));
+  if(report.sample) {
+    const x=report.sample;
+    lines.push(...wrap(`${d.sample}: ${d.open} ${x.open.shown}/${x.open.total??'?'} | ${d.merged} ${x.merged.shown}/${x.merged.total??'?'}`,width));
+  }
+  lines.push('',...wrap(DISPLAY_ORDER.map(k=>`[${t.labels[k]} ${report.summary[k]}]`).join(' '),width),'');
+  if (!report.items.length) lines.push(...wrap(t.empty,width),'');
+  const ranks={checks_failed:0,changes_requested:1,checks_need_attention:2,draft:3,incomplete_data:0,no_public_checks:1,non_success_results:2,insufficient_evidence:3};
+  const colors={attention:'1;33',unknown:'1;35',waiting:'1;36',done:'1;32'};
+  let index=0;
+  const field=(label,text)=>{
+    const prefix=`    ${label}: `, continuation=' '.repeat(cellWidth(prefix));
+    const wrapped=wrap(text,width,prefix,continuation);
+    if(color) wrapped[0]=wrapped[0].replace(`${label}:`,paint(`${label}:`,'1'));
+    lines.push(...wrapped);
+  };
+  for (const category of DISPLAY_ORDER) {
+    const items=report.items.filter(p=>p.category===category).sort((a,b)=>(ranks[a.reasons[0]?.code]??99)-(ranks[b.reasons[0]?.code]??99));
+    if (!items.length) continue;
+    lines.push(...wrap(`${t.labels[category]} (${items.length})`,width).map(line=>paint(line,colors[category])), '-'.repeat(Math.min(width,64)));
+    for (const p of items) {
+      const rank=String(++index).padStart(2,'0');
+      lines.push(...wrap(`${oneLine(p.repo)}#${p.number}`,width,`${rank}. `,'    '));
+      lines.push(...wrap(p.title,width,'    '));
+      const signals=[...new Set(p.reasons.map(r=>d.signals[r.code]).filter(Boolean))];
+      if(signals.length) field(d.signal,signals.join(' / '));
+      field(d.evidence,p.reasons.map(r=>r.message).join(' '));
+      field(d.next,p.nextStep);
+      for (const caveat of p.caveats) field(d.note,caveat);
+      // Do not break/copy-wrap a URL: terminals wrap it visually without inserting characters.
+      lines.push(`    ${oneLine(p.url)}`,'');
+    }
+  }
+  lines.push('-'.repeat(Math.min(width,64)),...wrap(report.scope,width));
+  for(const limitation of report.limitations) lines.push(...wrap(limitation,width));
   return lines.join('\n');
 }

@@ -28,3 +28,20 @@ test('CLI never changes local README or creates files',async()=>{
 test('network failure emits no misleading partial report',async()=>{
  let output='';await assert.rejects(main(['octocat'],{},{client:{get:async()=>{throw Error('API failure')}},write:s=>output+=s}));assert.equal(output,'');
 });
+test('terminal controls validate without changing report semantics',()=>{
+ assert.equal(parseArgs(['a','--color','never','--width','40']).width,40);
+ for(const args of [['a','--color','yes'],['a','--width','0'],['a','--width','999'],['a','--width','40x']])assert.throws(()=>parseArgs(args));
+});
+test('color is opt-in on TTY and NO_COLOR or dumb terminal always wins',async()=>{
+ async function run(args,env,isTTY){let out='';await main(['a',...args],env,{client:emptyClient,isTTY,write:s=>out+=s});return out;}
+ assert.doesNotMatch(await run([],{},false),/\x1b/);
+ assert.match(await run([],{},true),/\x1b/);
+ assert.match(await run(['--color','always'],{},false),/\x1b/);
+ for(const env of [{NO_COLOR:''},{TERM:'dumb'}])assert.doesNotMatch(await run(['--color','always'],env,true),/\x1b/);
+ assert.doesNotMatch(await run(['--json','--color','always'],{},true),/\x1b/);
+});
+test('automatic terminal width clamps and redirected output defaults to 80',async()=>{
+ async function run(isTTY,columns){let out='';await main(['octocat'],{NO_COLOR:''},{client:emptyClient,isTTY,columns,now:'2026-11-17T00:00:00Z',write:s=>out+=s});return out;}
+ assert.equal(await run(false,10),await run(false,80));
+ for(const cols of [1,19,501,1000])assert.match(await run(true,cols),/PR Next Action/);
+});

@@ -34,6 +34,49 @@ when needed, bearing in mind API limits. Current searches do not enumerate
 historical unmerged closed PRs; a PR closed during collection is labeled
 closed without merge.
 
+## A compact review brief
+
+An excerpt from a public-data snapshot (not a live status badge):
+
+```text
+PR Next Action / @jaesungkr
+Sample: open 5/9 | merged 2/2
+
+[Attention 1] [Unknown 3] [Waiting 1] [Done 2]
+
+Attention (1)
+----------------------------------------------------------------
+01. dask/dask#12736
+    Preserve NumPy creation result order through array finalization
+    Signal: Check failure / timeout / Draft
+    Evidence: 1 failing or timed-out HEAD check(s) observed.
+              This PR is still a draft.
+    Next: Inspect the failing logs and compare the baseline before
+          deciding whether a code change is needed.
+    https://github.com/dask/dask/pull/12736
+```
+
+Read top to bottom: **Attention → Unknown → Waiting → Done**. This is a
+reading order, not a severity score or a claim about who must respond.
+Every PR has a short signal, evidence, a suggested next step, and its full URL.
+Completed items stay at the bottom so they do not bury unresolved questions.
+
+```sh
+node src/cli.mjs YOUR_USERNAME --width 60
+node src/cli.mjs YOUR_USERNAME --color never
+```
+
+The layout follows terminal width; `--width 20..240` overrides it. No tables,
+emoji, box-drawing fonts, interactive controls, or terminal hyperlinks are
+required. English and Korean text wrap by display cells. Long links remain
+whole for copying and may soft-wrap in your terminal.
+
+Color is a small optional accent, never the only indicator. `--color auto`
+(default) uses color on a TTY; `always` also colors redirected text; `never`
+disables it. `NO_COLOR` (even empty) or `TERM=dumb` always disables color.
+Pipes use plain text and an 80-column layout by default. JSON stays uncolored
+and retains the same structured evidence regardless of visual layout.
+
 ## Four groups, not a merge verdict
 
 - **Needs a look**: change-request reviews, failed checks, checks requiring
@@ -107,7 +150,7 @@ the old behavior. Do not simply replace an old Action pin with this CLI revision
 node --test
 ```
 
-No runtime/test dependencies. CI covers Node 22 and 24. Tests cover classification
+No runtime/test dependencies. CI covers Node 22 and 24 on Linux, macOS, and Windows. Tests cover classification
 precedence, incomplete data, escaping, public/external boundaries, CLI behavior,
 and the no-write contract. AI assistance was used in implementation and tests.
 
