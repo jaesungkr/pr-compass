@@ -37,7 +37,7 @@ export function renderStream(data,{language='en',theme='auto'}={}) {
   const spineStart=y+30,sections=[];
   for(const kind of ['merged','open']) {
     const items=groups[kind],caption=kind==='open'&&items.some(p=>p.closed)?t.other:t[kind];
-    text(`${caption} · ${items.length}/${groups.totals[kind]} ${language==='ko'?'표시':'shown'}`,16,y,20,'','font-weight="600"');y+=26;
+    text(`${caption} · ${language==='ko'?'미리보기':'preview'}`,16,y,20,'','font-weight="600"');y+=26;
     if(!items.length) {text(t[kind==='merged'?'emptyMerged':'emptyOpen'],16,y+16,16,'muted');y+=49;}
     for(const p of items) {
       const center=y+22,merged=kind==='merged';
