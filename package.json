@@ -1,10 +1,18 @@
 {
   "name": "pr-compass",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Public pull request status for your GitHub profile",
+  "description": "Read-only next-action triage for public external GitHub pull requests",
   "type": "module",
-  "engines": {"node": ">=22"},
-  "scripts": {"test": "node --test", "start": "node src/cli.mjs"},
-  "license": "MIT"
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/cli.mjs"
+  },
+  "license": "MIT",
+  "bin": {
+    "pr-compass": "src/cli.mjs"
+  }
 }

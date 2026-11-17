@@ -2,157 +2,113 @@
 
 **English** · [한국어](README.ko.md)
 
-**Your open-source contributions, at a glance.**
+**Know which pull request to look at next.**
 
-A dependency-free GitHub Action and Node CLI that keeps a small status section in
-your profile README up to date. By default, it shows contributions to repositories
-owned by other users or organizations. It summarizes open and recently merged PRs, review
-records and current HEAD checks without pretending that a green check means
-“ready to merge.” English and Korean output are supported.
+A small, read-only CLI for your public contributions to other people's repositories.
+It groups PRs by observed signals and gives a reason, next step, and source link.
+No AI, server, dependencies, profile widgets, or write access.
 
-## Merge stream
+## Run
 
-A small, animated Git-branch sketch makes your contributions feel alive.
-Verified merged PRs flow into a shared contribution line; open PRs remain
-separate and still. This is a visual metaphor, not an actual repository graph,
-live activity, CI progress, or a prediction that an open PR will merge.
-
-The sketch shows up to three merged and two open PRs from the collected sample.
-Native, selectable PR links stay underneath: merged first, open below, with
-checks and review in a disclosure. No dates clutter the portfolio.
-
-Two lightweight SVGs live in your own repository. There is no external host,
-tracking, script, custom font, or dependency. Light and dark variants follow
-GitHub's theme; reduced-motion users get a still diagram. Use `stream: 'false'`
-or `--no-stream` for the native-text-only version.
-
-## Install in your profile
-
-1. In your `USERNAME/USERNAME` repository, add exactly one marker pair to
-   `README.md`, wherever you want the status section:
-
-   ```markdown
-   <!-- PR-COMPASS:START -->
-   <!-- PR-COMPASS:END -->
-   ```
-
-2. Copy [`examples/profile-workflow.yml`](examples/profile-workflow.yml) into
-   `.github/workflows/pr-compass.yml` in that repository. The example is pinned
-   to a tested full commit SHA. Review that revision before enabling the workflow;
-   keep future upgrades pinned to a full reviewed SHA too. The default username
-   is your repository owner. Change `language` to `ko` for Korean.
-
-3. Open **Actions → Update public PR status → Run workflow** on your default
-   branch. Check the first run and the resulting README commit. Thereafter the
-   workflow requests an update every six hours at minute 23, UTC.
-
-No PAT, third-party account, paid service, package install or repository-wide
-permission change is needed. The built-in, short-lived `GITHUB_TOKEN` is supplied
-by GitHub. The update job needs `contents: write` only to commit its own README.
-If branch protection or your organization blocks that write, keep the protection
-and adapt your own review process instead of granting broader access.
-
-The action edits the README and two stream SVGs. **Your workflow commits them together.** Everything
-outside the marker pair is preserved. Missing, duplicated or reversed markers
-are errors, not an invitation to overwrite your biography.
-
-## Action inputs
-
-| Input | Default | Meaning |
-| --- | --- | --- |
-| `username` | required | A valid GitHub username |
-| `readme` | `README.md` | File containing one marker pair |
-| `limit` | `5` | PRs per category, from 1 to 20 |
-| `language` | `en` | `en` or `ko` |
-| `include-own` | `false` | Include repositories owned by the queried `username` |
-| `stream` | `true` | Animated sketch; `false` for text only |
-| `assets-dir` | `assets/pr-compass` | Safe relative directory beside the README |
-| `token` | `${{ github.token }}` | Optional built-in token for rate limits |
-
-## Run locally
-
-Requires Node.js 22 or newer. Clone a revision you trust, then:
+Node.js 22 or newer:
 
 ```sh
-node src/cli.mjs --username YOUR_USERNAME --readme /path/to/README.md --limit 5
-node --test
+git clone https://github.com/jaesungkr/pr-compass.git
+cd pr-compass
+node src/cli.mjs YOUR_USERNAME
 ```
 
-Use `--language ko` for Korean. The CLI accepts `PR_COMPASS_USERNAME`,
-`PR_COMPASS_README`, `PR_COMPASS_LIMIT`, and `PR_COMPASS_LANGUAGE` environment
-variables, plus `PR_COMPASS_INCLUDE_OWN`, `PR_COMPASS_STREAM`, `PR_COMPASS_ASSETS_DIR`, and optional `GITHUB_TOKEN`. Never put a token in a command argument
-or commit it. Unauthenticated calls have much lower rate limits.
+No package installation is needed. Review the code you clone; use a reviewed
+commit rather than automatically upgrading to an unreviewed revision.
 
-To also include your own repositories, use `include-own: 'true'` in the Action
-or `--include-own` in the CLI. The default is `false`.
+```sh
+node src/cli.mjs YOUR_USERNAME --language ko
+node src/cli.mjs YOUR_USERNAME --limit 3
+node src/cli.mjs YOUR_USERNAME --json
+node src/cli.mjs --help
+```
 
-If you change `readme` or `assets-dir`, update the workflow’s `git add` paths.
-For text-only output, stage only the README. Existing assets are never removed
-automatically. Old `overview*.svg` cards are no longer used and may be deleted.
+The default limit is **5 open + 5 recently merged PRs**, not every PR.
+The report states how many matches were sampled. Increase `--limit` up to 20
+when needed, bearing in mind API limits. Current searches do not enumerate
+historical unmerged closed PRs; a PR closed during collection is labeled
+closed without merge.
 
-The example also runs when its own workflow file changes on the default branch,
-so installation and pinned-version updates can verify themselves. README updates
-do not trigger another run. If you rename the workflow, update its `push.paths`.
+## Four groups, not a merge verdict
 
-## What the status means
+- **Needs a look**: change-request reviews, failed checks, checks requiring
+  attention, or a draft. Inspect the evidence; a failure is not necessarily
+  caused by your patch, and an old change request may already be addressed.
+- **Waiting**: checks still running, or no observed actionable signal in the
+  available checks/reviews. This does not mean a maintainer owes you a response,
+  required approval is satisfied, or the PR is ready to merge.
+- **Done**: GitHub explicitly reports merged, or closed without merge. Those
+  outcomes remain distinct. A closed PR is not called a successful contribution.
+- **Unknown**: unavailable or partial information, no visible HEAD checks,
+  or an otherwise inconclusive state. No checks is never treated as passing.
 
-- **External by default.** Repository ownership is compared with the queried
-  `username`, case-insensitively, not with the token owner or workflow runner.
-  Your own repositories and forks are excluded. Organization-owned repositories
-  remain included, even when you belong to that organization. PRs from your fork
-  into somebody else's upstream repository are included.
-- **Public only.** Search is constrained to public PRs. Private repository
-  content is not a supported feature, even if a supplied token can read it.
-- **State is separate from CI.** Draft, open, merged and closed are PR states.
-  Failures, running checks, cancelled/action-required checks, success and
-  neutral/skipped results remain distinct. Zero visible checks is not success.
-- **Review records are not branch protection.** The latest decisive review per
-  reviewer and approvals on the observed HEAD are distinguished. Required
-  approvals, resolved conversations and branch rules are not inferred.
-- **HEAD only.** Results describe the fetched head SHA, not GitHub's test-merge
-  commit. A PR can change while a request is running. Open the linked source
-  before taking action.
-- **Bounded snapshot.** Searches retrieve at most 100 updated PRs per category;
-  the chosen limit controls how many are shown. Merged results are sorted by
-  actual merge date within that sample, not guaranteed global history. Search
-  indexing can lag. Truncated detail pages are marked partial.
-- **Unknown is not healthy.** Unavailable details are explicitly unknown or
-  partial. Search failure, incomplete search, bad input or invalid markers fail
-  the run and preserve the last README. Its observation timestamp remains old.
+Known actionable evidence remains worth inspecting even when other data is
+incomplete; the report includes that caveat. Merged/closed state takes
+precedence over historical check failures.
 
-## Operations and limits
+## What it reads
 
-GitHub schedules are best-effort, may be delayed or dropped, and run from the
-default branch. In public repositories, scheduled workflows may be disabled
-after 60 days without repository activity. Keep **Actions** notifications on if
-you want failure notices, and use manual dispatch to inspect or resume updates.
-This is a scheduled snapshot, not a real-time monitor.
+Only public PRs whose **base repository owner differs from the requested
+username**, case-insensitively. Your own repositories and forks are excluded.
+Organization-owned repositories remain included. A PR from your own fork into
+an upstream project is included.
 
-API limits include separate search and secondary limits. Requests are bounded
-and sequential; the tool does not retry aggressively. On a rate limit, wait
-until GitHub allows another run rather than increasing token permissions.
+The CLI reads PR state, latest decisive review records, check runs and legacy
+statuses on the fetched **HEAD SHA**. It does not evaluate branch protection,
+required checks, resolved conversations, merge queues, or test-merge checks.
+Review records are not a policy decision. Search indexing and PR state can
+change while the snapshot is being collected.
 
-To uninstall, remove the workflow and generated `stream-*.svg` files.
-Remove the marked block too if you no longer
-want the last snapshot displayed. Removing only the block will cause subsequent
-runs to fail safely.
+Each category searches up to 100 recently updated matches. The selected merged
+sample is ordered by actual merge date within those results, not guaranteed
+global history. The report is a bounded snapshot, not continuous monitoring.
+
+## Authentication and failures
+
+Works without a token when GitHub's public API allowance permits it.
+`GITHUB_TOKEN` is optional and read **only from the environment**. Never put a
+token in command arguments, commits, screenshots, or issues. Do not broaden
+permissions for this tool: it only makes GET requests for public data, even if
+a supplied token could read more.
+
+Requests are bounded, sequential, and timed out. GitHub rate limits can make
+a second unauthenticated run fail; wait for reset rather than retrying rapidly.
+Search failure, incomplete search, or unverified repository visibility aborts
+the report rather than producing false zeroes. Unavailable check/review
+details are explicitly unknown.
+
+Exit **0** means collection/reporting succeeded, not that your PRs are healthy.
+Invalid input or a failed collection exits **1**. `--json` emits one JSON
+document on stdout; errors go to stderr. There are no output files unless
+you explicitly redirect stdout yourself.
+
+Environment defaults: `PR_COMPASS_USERNAME`, `PR_COMPASS_LIMIT`,
+`PR_COMPASS_LANGUAGE`. Explicit CLI options override them.
+
+## Migrating from the profile version
+
+This is a different product direction. The current CLI **never edits READMEs,
+generates images, commits, or schedules updates**. The old composite Action and
+profile workflow example have been removed from main.
+
+If you installed an older pinned profile workflow, this repository cannot stop
+it for you. Remove that workflow from your profile repository, and remove its
+generated marker block/assets if no longer wanted. Old pinned commits retain
+the old behavior. Do not simply replace an old Action pin with this CLI revision.
 
 ## Development
 
-No runtime or test dependencies. `node --test` exercises fixture-based API
-responses, status classification, Markdown safety and preservation behavior.
-CI runs on Node 22 and 24. Do not add real tokens or private data to fixtures.
-AI assistance was used in the initial implementation and tests.
+```sh
+node --test
+```
 
-See [security and privacy](SECURITY.md). Contributions should include a regression
-test and keep the public-only, least-privilege boundary intact.
+No runtime/test dependencies. CI covers Node 22 and 24. Tests cover classification
+precedence, incomplete data, escaping, public/external boundaries, CLI behavior,
+and the no-write contract. AI assistance was used in implementation and tests.
 
-## References
-
-- [GitHub workflow permissions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions)
-- [Scheduled workflow behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
-- [GitHub REST API rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
-
-## License
-
-[MIT](LICENSE).
+[Security and privacy](SECURITY.md) · [MIT license](LICENSE)

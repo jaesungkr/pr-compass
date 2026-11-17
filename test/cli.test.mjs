@@ -1,48 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
-import {join} from 'node:path';
+import {mkdtemp,writeFile,readFile,readdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {main} from '../src/cli.mjs';
-const original='# Existing profile\n\n<!-- PR-COMPASS:START -->\nlast good\n<!-- PR-COMPASS:END -->\n\nMy footer.\n';
-async function withFile(fn){const dir=await mkdtemp(join(tmpdir(),'pr-compass-test-'));const path=join(dir,'README.md');await writeFile(path,original);try{await fn(path)}finally{await rm(dir,{recursive:true,force:true})}}
+import {join} from 'node:path';
+import {main,parseArgs} from '../src/cli.mjs';
 const emptyClient={get:async()=>({data:{items:[],total_count:0,incomplete_results:false}})};
-test('CLI writes only marker block with fixed timestamp',async()=>withFile(async path=>{await main(['--username','octocat','--readme',path,'--no-stream'],{},{client:emptyClient,now:'2026-11-17T00:00:00Z'});const result=await readFile(path,'utf8');assert.ok(result.startsWith('# Existing profile\n\n<!-- PR-COMPASS:START -->'));assert.ok(result.endsWith('<!-- PR-COMPASS:END -->\n\nMy footer.\n'));assert.match(result,/2026-11-17 00:00:00 UTC/);}));
-test('API failure preserves last good README byte for byte',async()=>withFile(async path=>{await assert.rejects(main(['--username','octocat','--readme',path,'--no-stream'],{},{client:{get:async()=>{throw Error('API failure')}}}));assert.equal(await readFile(path,'utf8'),original);}));
-test('missing markers fail before network',async()=>withFile(async path=>{await writeFile(path,'No markers');let called=false;await assert.rejects(main(['--username','octocat','--readme',path,'--no-stream'],{},{client:{get:async()=>{called=true}}}),/marker/);assert.equal(called,false);assert.equal(await readFile(path,'utf8'),'No markers');}));
-test('concurrent edits are not overwritten',async()=>withFile(async path=>{const client={get:async()=>{await writeFile(path,'Someone edited this');return emptyClient.get();}};await assert.rejects(main(['--username','octocat','--readme',path,'--no-stream'],{},{client}),/concurrent edits/);assert.equal(await readFile(path,'utf8'),'Someone edited this');}));
-test('invalid UTF8 fails without modifying bytes',async()=>withFile(async path=>{const bytes=Buffer.from([0xff,0xfe,0x00]);await writeFile(path,bytes);await assert.rejects(main(['--username','octocat','--readme',path,'--no-stream'],{},{client:emptyClient}),/UTF-8/);assert.deepEqual(await readFile(path),bytes);}));
-
-test('CLI writes only README, leaves old assets untouched, and creates no new asset directory',async()=>withFile(async path=>{
- const {mkdir,readdir}=await import('node:fs/promises');const folder=join(path,'..','assets','pr-compass');await mkdir(folder,{recursive:true});await writeFile(join(folder,'overview-light.svg'),'previous asset');
- await main(['--username','octocat','--readme',path,'--no-stream'],{},{client:emptyClient,now:'2026-11-17T00:00:00Z'});
- assert.deepEqual(await readdir(folder),['overview-light.svg']);assert.equal(await readFile(join(folder,'overview-light.svg'),'utf8'),'previous asset');
- assert.doesNotMatch(await readFile(path,'utf8'),/<img|<svg|<picture|\.svg/);
-}));
-test('unsafe asset path fails before requests',async()=>withFile(async path=>{
- for(const dir of ['../outside','/tmp/out','.git/objects','a//b']){
- let called=false;await assert.rejects(main(['--username','octocat','--readme',path,'--assets-dir',dir],{},{client:{get:async()=>{called=true}}}),/assets-dir/);assert.equal(called,false);}
-}));
-test('default stream writes two local SVGs and matching README references',async()=>withFile(async path=>{
- const {readdir}=await import('node:fs/promises');
- await main(['--username','octocat','--readme',path],{},{client:emptyClient,now:'2026-11-17T00:00:00Z'});
- const folder=join(path,'..','assets','pr-compass');
- assert.deepEqual((await readdir(folder)).sort(),['stream-dark.svg','stream-light.svg']);
- assert.match(await readFile(path,'utf8'),/stream-light\.svg\?v=/);
-}));
-test('asset symlink fails without writing',async()=>withFile(async path=>{
- const {mkdir,symlink}=await import('node:fs/promises');await mkdir(join(path,'..','outside'));await symlink(join(path,'..','outside'),join(path,'..','assets'));
- let called=false;await assert.rejects(main(['--username','octocat','--readme',path],{},{client:{get:async()=>{called=true}}}),/symlinks/);assert.equal(called,false);
-}));
-test('README symlink rejected before network',async()=>withFile(async path=>{
- const {symlink}=await import('node:fs/promises');const link=join(path,'..','linked.md');await symlink(path,link);let called=false;
- await assert.rejects(main(['--username','octocat','--readme',link],{},{client:{get:async()=>{called=true}}}),/symlink/);assert.equal(called,false);
-}));
-test('stream failure preserves existing assets and README',async()=>withFile(async path=>{
- const {mkdir}=await import('node:fs/promises');const folder=join(path,'..','assets','pr-compass');await mkdir(folder,{recursive:true});await writeFile(join(folder,'stream-light.svg'),'last good');
- await assert.rejects(main(['--username','octocat','--readme',path],{},{client:{get:async()=>{throw Error('API error')}}}));
- assert.equal(await readFile(path,'utf8'),original);assert.equal(await readFile(join(folder,'stream-light.svg'),'utf8'),'last good');
-}));
-test('invalid stream boolean fails before network',async()=>withFile(async path=>{
- let called=false;await assert.rejects(main(['--username','octocat','--readme',path],{PR_COMPASS_STREAM:'maybe'},{client:{get:async()=>{called=true}}}),/stream must/);assert.equal(called,false);
-}));
+test('positional user, flags, and environment priority',()=>{
+ const o=parseArgs(['other','--limit','3','--language','ko','--json'],{PR_COMPASS_USERNAME:'octocat'});assert.equal(o.username,'other');assert.equal(o.limit,3);assert.equal(o.language,'ko');assert.equal(o.json,true);
+ assert.equal(parseArgs(['--username','octocat'],{}).limit,5);
+});
+test('unknown flags, absent user and invalid values fail',()=>{
+ for(const a of [[],['--username'],['a','b'],['a','--username','b'],['a','--readme','README.md'],['a','--limit','0'],['a','--language','xx'],['a','--include-own']])assert.throws(()=>parseArgs(a,{}));
+});
+test('help succeeds without API request',async()=>{
+ let output='',called=false;await main(['--help'],{},{client:{get:async()=>{called=true}},write:s=>output+=s});assert.equal(called,false);assert.match(output,/Read-only/);
+});
+test('JSON output is one valid report, no commentary',async()=>{
+ let output='';const r=await main(['octocat','--json'],{},{client:emptyClient,now:'2026-11-17T00:00:00Z',write:s=>output+=s});assert.deepEqual(JSON.parse(output),r);assert.equal(r.username,'octocat');assert.deepEqual(r.sample,{open:{shown:0,total:0},merged:{shown:0,total:0}});
+});
+test('plain output describes empty findings without false health claim',async()=>{
+ let output='';await main(['octocat'],{},{client:emptyClient,write:s=>output+=s});assert.match(output,/octocat/);assert.doesNotMatch(output,/\x1b/);
+});
+test('CLI never changes local README or creates files',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'pr-next-readonly-'));const file=join(dir,'README.md');await writeFile(file,'unchanged');
+ try{await main(['octocat'],{PR_COMPASS_README:file},{client:emptyClient,write:()=>{}});assert.equal(await readFile(file,'utf8'),'unchanged');assert.deepEqual(await readdir(dir),['README.md']);}finally{await rm(dir,{recursive:true,force:true});}
+});
+test('network failure emits no misleading partial report',async()=>{
+ let output='';await assert.rejects(main(['octocat'],{},{client:{get:async()=>{throw Error('API failure')}},write:s=>output+=s}));assert.equal(output,'');
+});
