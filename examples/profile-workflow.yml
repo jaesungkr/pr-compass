@@ -1,5 +1,8 @@
 name: Update public PR status
 on:
+  push:
+    paths:
+      - '.github/workflows/pr-compass.yml'
   schedule:
     - cron: '23 */6 * * *'
   workflow_dispatch:
@@ -10,6 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   update:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -23,10 +27,10 @@ jobs:
           language: en
           include-own: 'false'
           token: ${{ github.token }}
-      - name: Commit the README
+      - name: Commit the README and Merge stream
         shell: bash
         run: |
-          git add -- README.md
+          git add -- README.md assets/pr-compass
           if git diff --cached --quiet; then exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'

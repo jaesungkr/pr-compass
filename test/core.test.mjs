@@ -106,3 +106,12 @@ test('native titles escape injected Markdown and HTML in both visible lists',asy
  assert.doesNotMatch(md,/<img|@everyone|\]\(https:\/\/evil\.test\)/);
  assert.match(md,/&lt;img/);
 });
+test('stream embedding keeps native links, uses theme anchors and validates relative path',()=>{
+ const data={merged:[],open:[],totals:{merged:0,open:0},observedAt:'2026-11-17T00:00:00.000Z',includeOwn:false};
+ const md=renderMarkdown(data,{stream:{directory:'assets/pr-compass'}});
+ assert.equal((md.match(/<a href=/g)||[]).length,2);
+ assert.match(md,/stream-light\.svg\?v=.*#gh-light-mode-only/);
+ assert.match(md,/stream-dark\.svg\?v=.*#gh-dark-mode-only/);
+ assert.ok(md.indexOf('Recently merged')<md.indexOf('#### Open'));
+ assert.throws(()=>renderMarkdown(data,{stream:{directory:'../evil'}}),/Invalid stream/);
+});

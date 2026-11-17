@@ -4,16 +4,18 @@ PR Compass is a read-only GitHub.com public-data reader. It does not check out
 pull request code, execute titles, write comments, merge PRs or read private PRs.
 Treat all upstream titles and API responses as untrusted.
 
-The Action writes only its selected README. The caller commits it.
-Output uses native Markdown and supported HTML, without generated images or
-external resources. Use the short-lived built-in `GITHUB_TOKEN`, not a personal
+The Action writes its selected README and two stream SVGs in a validated relative
+directory. The caller commits them together. SVGs contain no scripts, external
+resources, links or embedded HTML; native PR links remain in the README.
+Animation represents verified state, not real-time progress or merge readiness. Use the short-lived built-in `GITHUB_TOKEN`, not a personal
 access token. The example grants `contents: write` only to the update job so it
 can save its own repository's README. It does not grant write access to upstream
 repositories. No repository-wide permission change is required.
 
 Pin the action and dependencies to full commit SHAs. Review updates before
-changing the pin. Run updates only on the default branch through `schedule` or
-`workflow_dispatch`, never `pull_request_target` or untrusted PR code.
+changing the pin. Run updates only on the default branch through `schedule`,
+`workflow_dispatch`, or a push changing the workflow file itself. Never use
+`pull_request_target` or untrusted PR code.
 
 Missing or duplicate markers, search failures, and invalid inputs fail without
 replacing the README. An old observation timestamp means the display may be

@@ -10,15 +10,21 @@ owned by other users or organizations. It summarizes open and recently merged PR
 records and current HEAD checks without pretending that a green check means
 “ready to merge.” English and Korean output are supported.
 
-## A native README, not an image
+## Merge stream
 
-Recently merged contributions come first, with linked titles and quiet repository
-metadata. Open work remains visible below, with expandable review
-and HEAD-check details available without leaving GitHub.
+A small, animated Git-branch sketch makes your contributions feel alive.
+Verified merged PRs flow into a shared contribution line; open PRs remain
+separate and still. This is a visual metaphor, not an actual repository graph,
+live activity, CI progress, or a prediction that an open PR will merge.
 
-Everything is native Markdown and supported HTML: selectable text, real links,
-natural wrapping on narrow screens, and GitHub's own light and dark themes.
-No generated images, badges, external hosting, or extra assets.
+The sketch shows up to three merged and two open PRs from the collected sample.
+Native, selectable PR links stay underneath: merged first, open below, with
+checks and review in a disclosure. No dates clutter the portfolio.
+
+Two lightweight SVGs live in your own repository. There is no external host,
+tracking, script, custom font, or dependency. Light and dark variants follow
+GitHub's theme; reduced-motion users get a still diagram. Use `stream: 'false'`
+or `--no-stream` for the native-text-only version.
 
 ## Install in your profile
 
@@ -46,7 +52,7 @@ by GitHub. The update job needs `contents: write` only to commit its own README.
 If branch protection or your organization blocks that write, keep the protection
 and adapt your own review process instead of granting broader access.
 
-The action edits only the README. **Your workflow owns committing it.** Everything
+The action edits the README and two stream SVGs. **Your workflow commits them together.** Everything
 outside the marker pair is preserved. Missing, duplicated or reversed markers
 are errors, not an invitation to overwrite your biography.
 
@@ -59,6 +65,8 @@ are errors, not an invitation to overwrite your biography.
 | `limit` | `5` | PRs per category, from 1 to 20 |
 | `language` | `en` | `en` or `ko` |
 | `include-own` | `false` | Include repositories owned by the queried `username` |
+| `stream` | `true` | Animated sketch; `false` for text only |
+| `assets-dir` | `assets/pr-compass` | Safe relative directory beside the README |
 | `token` | `${{ github.token }}` | Optional built-in token for rate limits |
 
 ## Run locally
@@ -72,15 +80,19 @@ node --test
 
 Use `--language ko` for Korean. The CLI accepts `PR_COMPASS_USERNAME`,
 `PR_COMPASS_README`, `PR_COMPASS_LIMIT`, and `PR_COMPASS_LANGUAGE` environment
-variables, plus `PR_COMPASS_INCLUDE_OWN`, and optional `GITHUB_TOKEN`. Never put a token in a command argument
+variables, plus `PR_COMPASS_INCLUDE_OWN`, `PR_COMPASS_STREAM`, `PR_COMPASS_ASSETS_DIR`, and optional `GITHUB_TOKEN`. Never put a token in a command argument
 or commit it. Unauthenticated calls have much lower rate limits.
 
 To also include your own repositories, use `include-own: 'true'` in the Action
 or `--include-own` in the CLI. The default is `false`.
 
-If you change `readme`, update the workflow’s `git add` path too.
-Upgrading from the image-based version? Remove `assets-dir` inputs and the old
-generated `assets/pr-compass` folder, then stage only your README in the workflow.
+If you change `readme` or `assets-dir`, update the workflow’s `git add` paths.
+For text-only output, stage only the README. Existing assets are never removed
+automatically. Old `overview*.svg` cards are no longer used and may be deleted.
+
+The example also runs when its own workflow file changes on the default branch,
+so installation and pinned-version updates can verify themselves. README updates
+do not trigger another run. If you rename the workflow, update its `push.paths`.
 
 ## What the status means
 
@@ -120,7 +132,7 @@ API limits include separate search and secondary limits. Requests are bounded
 and sequential; the tool does not retry aggressively. On a rate limit, wait
 until GitHub allows another run rather than increasing token permissions.
 
-To uninstall, remove the workflow.
+To uninstall, remove the workflow and generated `stream-*.svg` files.
 Remove the marked block too if you no longer
 want the last snapshot displayed. Removing only the block will cause subsequent
 runs to fail safely.

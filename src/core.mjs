@@ -125,10 +125,23 @@ const texts = {
   en:{heading:'Contribution activity',allHeading:'Public pull requests',external:'External repositories only',allScope:'All public repositories',showing:(shown,total)=>`Showing ${shown} of ${total}`,details:'PR links & status details',method:'About this snapshot',open:'Open',merged:'Recently merged',empty:'No public PRs found.',columns:'Contribution | Status | Checks · review',draft:'Draft',closed:'Closed',mergedState:'Merged',openState:'Open',unknown:'Unavailable',partial:'Partial data',none:'No public HEAD checks',success:'success',failed:'failed',pending:'pending',attention:'cancelled / action needed',other:'neutral / skipped / other',noReviews:'No active decision reviews',approved:'approved',current:'on current HEAD',changes:'changes requested',at:'Observed',scope:'Public PRs only. HEAD checks and review records are not a merge-readiness verdict. Required checks, branch protection, test-merge checks, and resolved conversations are not evaluated.',cap:'Lists are sampled from up to 100 most recently updated matches; merged items are sorted by merge date within that sample.',count:'search matches'},
   ko:{heading:'최근 기여 현황',allHeading:'공개 Pull Request',external:'외부 저장소 기여만 표시',allScope:'모든 공개 저장소',showing:(shown,total)=>`${total}건 중 ${shown}건 표시`,details:'PR 링크와 상세 상태',method:'조회 범위와 상태 안내',open:'진행 중',merged:'최근 병합',empty:'조회된 공개 PR이 없습니다.',columns:'기여 | 상태 | 검사 · 리뷰',draft:'초안',closed:'닫힘',mergedState:'병합',openState:'진행 중',unknown:'조회 불가',partial:'일부 정보',none:'공개 HEAD 검사 없음',success:'성공',failed:'실패',pending:'진행',attention:'취소·조치 필요',other:'중립·생략·기타',noReviews:'유효한 결정 리뷰 없음',approved:'승인',current:'현재 HEAD',changes:'수정 요청',at:'확인',scope:'공개 PR만 표시합니다. HEAD 검사와 리뷰 기록은 병합 가능 판정이 아닙니다. 필수 검사·브랜치 보호·테스트 병합 커밋 검사·대화 해결 여부는 확인하지 않습니다.',cap:'최근 업데이트순 최대 100건에서 조회하며, 병합 목록은 그 결과 안에서 병합일순입니다.',count:'검색 결과'}
 };
-export function renderMarkdown(data, {language='en'} = {}) {
+export function renderMarkdown(data, {language='en',stream} = {}) {
   const t = texts[language]; if (!t) throw new Error('Language must be en or ko.');
   const observed=data.observedAt.replace('T',' ').replace(/\.\d{3}Z$/,' UTC');
   const lines=[`### ${t.merged} · ${data.totals.merged}`, '', `<sub>${data.includeOwn?t.allScope:t.external} · ${t.showing(data.merged.length,data.totals.merged)}</sub>`, ''];
+  if(stream) {
+    const directory=stream.directory;
+    if(typeof directory!=='string'||!/^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)*$/.test(directory)||directory.split('/').some(p=>p==='.'||p==='..'))throw new Error('Invalid stream directory.');
+    const version=encodeURIComponent(data.observedAt);
+    const alt=language==='ko'?'Merge stream: 병합된 기여는 합류하고, 열린 PR은 분리되어 있습니다. 아래에 실제 PR 링크가 있습니다.':'Merge stream: merged contributions join; open PRs remain separate. Actual PR links follow.';
+    const embed=[];
+    for(const theme of ['light','dark']){
+      const url=directory+'/stream-'+theme+'.svg?v='+version+'#gh-'+theme+'-mode-only';
+      embed.push('<a href="'+url+'"><img src="'+url+'" alt="'+alt+'" width="440"></a>');
+    }
+    // Anchor fragments are required for GitHub theme visibility, not img fragments alone.
+    lines.unshift(...embed,'');
+  }
   const metadata=p=>`${escapeMarkdown(p.repo)} · #${p.number}`;
   const state=p=>p.merged?t.mergedState:p.closed?t.closed:p.draft?t.draft:t.openState;
   for(const p of data.merged)lines.push(`- **[${escapeMarkdown(p.title)}](${p.url})**  `,`  <sub>${metadata(p)}</sub>`,'');
