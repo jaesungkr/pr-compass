@@ -85,3 +85,17 @@ test('include-own cannot opt into private data',async()=>{
  const f=fixture([{data:search([item()])},{data:search([])},{data:p}]);
  await assert.rejects(collect({username:'octocat',includeOwn:true,client:f.client}),/visibility/);
 });
+
+test('merged-first visual embeds responsive themes with native PR links and accessible detail',async()=>{
+ const p=pr();p.merged=true;p.state='closed';
+ const f=fixture([{data:search([])},{data:search([item()])},...detailResponses(p)]);
+ const data=await collect({username:'octocat',client:f.client,now:'2026-01-01T00:00:00Z'});
+ const md=renderMarkdown(data,{visual:{directory:'assets/pr-compass'}});
+ for(const name of ['overview-light','overview-dark','overview-mobile-light','overview-mobile-dark'])assert.match(md,new RegExp(name+'\\.svg\\?v='));
+ assert.match(md,/prefers-color-scheme: dark/);assert.match(md,/max-width: 600px/);
+ assert.match(md,/alt="Recently merged: 1; Open: 0/);assert.match(md,/PR links & status details/);
+ assert.ok(md.indexOf('#### Recently merged')<md.indexOf('#### Open'));
+ assert.match(md,/\[upstream\/example #1\]\(https:\/\/github.com\/upstream\/example\/pull\/1\)/);
+ assert.throws(()=>renderMarkdown(data,{visual:{directory:'../outside'}}),/visual directory/);
+ assert.throws(()=>renderMarkdown(data,{visual:{directory:'https://evil.test'}}),/visual directory/);
+});
