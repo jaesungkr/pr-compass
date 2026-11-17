@@ -1,9 +1,12 @@
 # PR Compass
 
-**Your public pull requests, without losing the nuance.**
+**English** · [한국어](README.ko.md)
+
+**Your open-source contributions, at a glance.**
 
 A dependency-free GitHub Action and Node CLI that keeps a small status section in
-your profile README up to date. It shows open PRs and recently merged PRs, review
+your profile README up to date. By default, it shows contributions to repositories
+owned by other users or organizations. It summarizes open and recently merged PRs, review
 records and current HEAD checks without pretending that a green check means
 “ready to merge.” English and Korean output are supported.
 
@@ -45,6 +48,7 @@ are errors, not an invitation to overwrite your biography.
 | `readme` | `README.md` | File containing one marker pair |
 | `limit` | `5` | PRs per category, from 1 to 20 |
 | `language` | `en` | `en` or `ko` |
+| `include-own` | `false` | Include repositories owned by the queried `username` |
 | `token` | `${{ github.token }}` | Optional built-in token for rate limits |
 
 ## Run locally
@@ -58,11 +62,19 @@ node --test
 
 Use `--language ko` for Korean. The CLI accepts `PR_COMPASS_USERNAME`,
 `PR_COMPASS_README`, `PR_COMPASS_LIMIT`, and `PR_COMPASS_LANGUAGE` environment
-variables, plus optional `GITHUB_TOKEN`. Never put a token in a command argument
+variables, plus `PR_COMPASS_INCLUDE_OWN` and optional `GITHUB_TOKEN`. Never put a token in a command argument
 or commit it. Unauthenticated calls have much lower rate limits.
+
+To also include your own repositories, use `include-own: 'true'` in the Action
+or `--include-own` in the CLI. The default is `false`.
 
 ## What the status means
 
+- **External by default.** Repository ownership is compared with the queried
+  `username`, case-insensitively, not with the token owner or workflow runner.
+  Your own repositories and forks are excluded. Organization-owned repositories
+  remain included, even when you belong to that organization. PRs from your fork
+  into somebody else's upstream repository are included.
 - **Public only.** Search is constrained to public PRs. Private repository
   content is not a supported feature, even if a supplied token can read it.
 - **State is separate from CI.** Draft, open, merged and closed are PR states.

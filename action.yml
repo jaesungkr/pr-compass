@@ -17,6 +17,9 @@ inputs:
   language:
     description: Output language (en or ko)
     default: en
+  include-own:
+    description: Include repositories owned by username (including own forks); organizations remain included either way
+    default: 'false'
   token:
     description: Optional built-in GitHub token for API rate limits; do not use a personal access token
     default: ${{ github.token }}
@@ -34,6 +37,7 @@ runs:
         INPUT_USERNAME: ${{ inputs.username }}
         INPUT_README: ${{ inputs.readme }}
         INPUT_LIMIT: ${{ inputs.limit }}
+        INPUT_INCLUDE_OWN: ${{ inputs.include-own }}
         INPUT_LANGUAGE: ${{ inputs.language }}
         GITHUB_TOKEN: ${{ inputs.token }}
       run: node "$ACTION_PATH/src/cli.mjs"

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {START,END,replaceBlock,escapeMarkdown,validateUsername,validateLimit,summarizeReviews,summarizeChecks,GitHubClient,collect,renderMarkdown} from '../src/core.mjs';
 import {parseArgs} from '../src/cli.mjs';
-const sha='a'.repeat(40), repo='octocat/example';
+const sha='a'.repeat(40), repo='upstream/example';
 const item=(n=1)=>({repository_url:`https://api.github.com/repos/${repo}`,number:n,pull_request:{merged_at:'2026-01-01T00:00:00Z'}});
 const pr=(n=1)=>({number:n,title:'Fix thing',base:{repo:{private:false,full_name:repo}},head:{sha},state:'open',draft:false,merged:false});
 const search=items=>({items,total_count:items.length,incomplete_results:false});
@@ -34,6 +34,54 @@ test('429 stops further network attempts and never prints secret',async()=>{cons
 test('403 without rate metadata is ordinary unavailable, not blanket global cooldown',async()=>{const f=fixture([{status:403},{data:[]}]);await assert.rejects(f.client.get('/test'),/HTTP 403/);await f.client.get('/other');assert.equal(f.calls.length,2);});
 test('network errors hide sensitive error details',async()=>{const f=fixture([{throw:true}]);await assert.rejects(f.client.get('/test'),/network request failed/);});
 test('merged sample sorted by actual merge date',async()=>{const old={...item(1),pull_request:{merged_at:'2026-01-01T00:00:00Z'}},recent={...item(2),pull_request:{merged_at:'2026-02-01T00:00:00Z'}};const p=pr(2);p.merged=true;p.state='closed';const f=fixture([{data:search([])},{data:search([old,recent])},...detailResponses(p)]);const d=await collect({username:'octocat',limit:1,client:f.client});assert.equal(d.merged[0].number,2);assert.match(renderMarkdown(d),/Merged/);});
-test('non-GitHub repository URL cannot inject network target',async()=>{const bad={...item(),repository_url:'https://evil.test/owner/repo'};const f=fixture([{data:search([bad])},{data:search([])}]);await assert.rejects(collect({username:'octocat',client:f.client}),/Unexpected/);assert.equal(f.calls.length,2);});
+test('non-GitHub repository URL cannot inject network target',async()=>{const bad={...item(),repository_url:'https://evil.test/owner/repo'};const f=fixture([{data:search([bad])},{data:search([])}]);await assert.rejects(collect({username:'octocat',client:f.client}),/Unexpected/);assert.equal(f.calls.length,1);});
 
 test('malformed JSON errors do not leak raw response text',async()=>{const client=new GitHubClient({fetchImpl:async()=>({ok:true,headers:{get:()=>null},json:async()=>{throw Error('SECRET response body');}})});await assert.rejects(client.get('/test'),e=>e.message==='GitHub returned an invalid JSON response.');});
+
+test('external scope is default and excludes own repositories case-insensitively',async()=>{
+ const own={...item(2),repository_url:'https://api.github.com/repos/OCTOCAT/own-fork'};
+ const f=fixture([{data:search([own,item()])},{data:search([])},...detailResponses()]);
+ const d=await collect({username:'Octocat',client:f.client});
+ assert.match(decodeURIComponent(f.calls[0].url),/-user:Octocat/);
+ assert.equal(d.includeOwn,false);assert.equal(d.open.length,1);assert.equal(d.totals.open,1);
+ assert.equal(f.calls.some(c=>c.url.includes('/OCTOCAT/own-fork/')),false);
+ assert.match(renderMarkdown(d),/External repositories only/);
+});
+test('include-own opt-in includes own repositories and removes exclusion query',async()=>{
+ const own={...item(),repository_url:'https://api.github.com/repos/Octocat/own'};
+ const p=pr();p.base.repo.full_name='Octocat/own';
+ const f=fixture([{data:search([own])},{data:search([])},...detailResponses(p)]);
+ const d=await collect({username:'octocat',includeOwn:true,client:f.client});
+ assert.equal(decodeURIComponent(f.calls[0].url).includes('-user:'),false);
+ assert.equal(d.open.length,1);assert.equal(d.open[0].repo,'Octocat/own');
+ assert.match(renderMarkdown(d),/All public repositories/);
+});
+test('organizations remain included in external-only scope',async()=>{
+ const f=fixture([{data:search([item()])},{data:search([])},...detailResponses()]);
+ const d=await collect({username:'octocat',client:f.client});assert.equal(d.open[0].repo,'upstream/example');
+});
+test('include-own CLI and environment settings have strict boolean semantics',()=>{
+ assert.equal(parseArgs(['--username','octocat'],{}).includeOwn,false);
+ assert.equal(parseArgs(['--username','octocat','--include-own'],{}).includeOwn,true);
+ assert.equal(parseArgs([],{INPUT_USERNAME:'octocat',INPUT_INCLUDE_OWN:'true'}).includeOwn,true);
+ assert.equal(parseArgs([],{INPUT_USERNAME:'octocat',INPUT_INCLUDE_OWN:'true',PR_COMPASS_INCLUDE_OWN:'false'}).includeOwn,false);
+ for(const bad of ['yes','1','FALSE',''])assert.throws(()=>parseArgs([],{INPUT_USERNAME:'octocat',INPUT_INCLUDE_OWN:bad}),/include-own/);
+});
+test('compact three-column output shows counts, exact HEAD, active review and localized scope',async()=>{
+ const p=pr();p.draft=true;
+ const responses=detailResponses(p);responses[2].data={total_count:3,check_runs:[{status:'completed',conclusion:'success'},{status:'completed',conclusion:'skipped'},{status:'completed',conclusion:'failure'}]};
+ const f=fixture([{data:{...search([item()]),total_count:7}},{data:search([])},...responses]);
+ const d=await collect({username:'octocat',client:f.client});const md=renderMarkdown(d);
+ assert.match(md,/Showing 1 of 7/);assert.match(md,/\| --- \| --- \| --- \|/);
+ assert.doesNotMatch(md,/\| --- \| --- \| --- \| --- \|/);
+ assert.match(md,/\*\*Draft\*\*/);assert.match(md,new RegExp(`/commit/${sha}`));
+ assert.match(md,/1 success; 1 failed; 1 neutral \/ skipped \/ other/);
+ assert.doesNotMatch(md,/0 pending|0 approved|0 changes requested/);
+ assert.match(md,/No active decision reviews/);assert.match(md,/<details>/);
+ const ko=renderMarkdown(d,{language:'ko'});assert.match(ko,/외부 저장소 기여만 표시/);assert.match(ko,/7건 중 1건 표시/);assert.match(ko,/초안/);
+});
+test('include-own cannot opt into private data',async()=>{
+ const p=pr();p.base.repo.private=true;
+ const f=fixture([{data:search([item()])},{data:search([])},{data:p}]);
+ await assert.rejects(collect({username:'octocat',includeOwn:true,client:f.client}),/visibility/);
+});
