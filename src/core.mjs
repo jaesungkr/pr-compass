@@ -137,7 +137,7 @@ export function renderMarkdown(data, {language='en', visual} = {}) {
     // GitHub rewrites prefers-color-scheme source media, dropping compound width conditions.
     // Theme fragments hide one image; each independent picture keeps its width-only source.
     lines.splice(0, lines.length);
-    for (const theme of ['light','dark']) lines.push('<picture>', `  <source media="(max-width: 600px)" srcset="${asset('overview-mobile-'+theme)}#gh-${theme}-mode-only">`, `  <img src="${asset('overview-'+theme)}#gh-${theme}-mode-only" alt="${alt}" width="920">`, '</picture>');
+    for (const theme of ['light','dark']) lines.push(`<a href="${asset('overview-'+theme)}#gh-${theme}-mode-only">`, '<picture>', `  <source media="(max-width: 600px)" srcset="${asset('overview-mobile-'+theme)}#gh-${theme}-mode-only">`, `  <img src="${asset('overview-'+theme)}#gh-${theme}-mode-only" alt="${alt}" width="920">`, '</picture>', '</a>');
     lines.push('');
     if (data.merged.length) lines.push(`**${t.merged}:** ` + data.merged.slice(0,3).map(p => `[${escapeMarkdown(p.repo)} #${p.number}](${p.url})`).join(' · '), '');
     lines.push('<details>', `<summary>${t.details}</summary>`, '', `> ${t.at}: ${data.observedAt.replace('T',' ').replace(/\.\d{3}Z$/,' UTC')}`, '');
